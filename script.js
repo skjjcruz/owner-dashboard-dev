@@ -5,6 +5,7 @@
  * - Years in League (from players dictionary years_exp)
  * - Pts / GP from Sleeper season stats
  * - Avg = Pts / GP
+ * - PROJ = weekly projection points (Sleeper projections, scored by league scoring_settings)
  * - Draft picks (2026–2028) grouped by year at bottom
  *************************************************/
 
@@ -44,6 +45,7 @@ let state = {
   rosterByRosterId: {},
   playersById: null,
   statsByPlayerId: null,
+  projectionsByPlayerId: null, // <— NEW
   scoring: {},
   currentLeftOwnerId: null,
   currentRightOwnerId: null,
@@ -92,7 +94,9 @@ function makeAvatarImg(ownerId, size = 22) {
   img.alt = "";
   img.width = size;
   img.height = size;
-  img.onerror = () => { img.style.display = "none"; };
+  img.onerror = () => {
+    img.style.display = "none";
+  };
 
   return img;
 }
@@ -136,6 +140,7 @@ function normalizePos(pos) {
   return "OTHER";
 }
 
+// Not used anymore in the table, but harmless to keep
 function nflAbbrev(playerObj) {
   return playerObj?.team || "";
 }
@@ -215,6 +220,27 @@ function fantasyPointsFromScoring(statsObj, scoring) {
   return pts;
 }
 
+/* ===== Projections helper ===== */
+function projectionPointsForPlayerId(playerId) {
+  const proj = state.projectionsByPlayerId?.[String(playerId)] || null;
+  if (!proj) return null;
+  const pts = fantasyPointsFromScoring(proj, state.scoring);
+  return pts;
+}
+
+function getCurrentLeagueWeek() {
+  // Sleeper league object often has current week on settings
+  const w =
+    state.league?.settings?.week ??
+    state.league?.settings?.leg ??
+    state.league?.settings?.current_week ??
+    state.league?.week ??
+    null;
+
+  const n = Number(w);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 /* ===== Group players by position and sort ===== */
 function groupPlayers(playerIds) {
   const groups = {};
@@ -265,10 +291,11 @@ function addGroupHeader(tbody, label, count) {
 
 /* ===== PICKS: robust build ===== */
 function detectPickIdMode() {
-  const rosterIds = new Set(state.rosters.map(r => String(r.roster_id)));
-  const userIds = new Set(state.users.map(u => String(u.user_id)));
+  const rosterIds = new Set(state.rosters.map((r) => String(r.roster_id)));
+  const userIds = new Set(state.users.map((u) => String(u.user_id)));
 
-  let rosterHits = 0, userHits = 0;
+  let rosterHits = 0,
+    userHits = 0;
   for (const tp of state.tradedPicks || []) {
     const oid = String(tp.owner_id ?? "");
     if (rosterIds.has(oid)) rosterHits++;
@@ -338,7 +365,7 @@ function buildPicksByOwner() {
   }
 
   for (const oid of Object.keys(picksByOwnerId)) {
-    picksByOwnerId[oid].sort((a, b) => (a.year - b.year) || (a.round - b.round));
+    picksByOwnerId[oid].sort((a, b) => a.year - b.year || a.round - b.round);
   }
 
   state.picksByOwnerId = picksByOwnerId;
@@ -363,35 +390,38 @@ function addDraftPicksSection(tbody, ownerId) {
     const arr = byYear[y] || [];
 
     if (!arr.length) {
-      tbody.appendChild(trRow([
-        { className: "pos posCell", text: String(y) },
-        { className: "player", text: "— none —" },
-        { className: "yrs", text: "" },
-        { className: "pts", text: "" },
-        { className: "gp", text: "" },
-        { className: "avg", text: "" },
-        { className: "nfl", text: "" }
-      ]));
+      tbody.appendChild(
+        trRow([
+          { className: "pos posCell", text: String(y) },
+          { className: "player", text: "— none —" },
+          { className: "yrs", text: "" },
+          { className: "pts", text: "" },
+          { className: "gp", text: "" },
+          { className: "avg", text: "" },
+          { className: "proj", text: "" },
+        ])
+      );
       continue;
     }
 
     for (const p of arr) {
       const fromName = p.fromOwnerId ? safeName(state.usersById[p.fromOwnerId]) : "";
-      tbody.appendChild(trRow([
-        { className: "pos posCell", text: String(y) },
-        { className: "player", text: ordinal(p.round) },
-        { className: "yrs", text: "" },
-        { className: "pts", text: "" },
-        { className: "gp", text: "" },
-        { className: "avg", text: "" },
-        { className: "nfl", text: fromName || "", noWrap: true }
-      ]));
+      tbody.appendChild(
+        trRow([
+          { className: "pos posCell", text: String(y) },
+          { className: "player", text: ordinal(p.round) },
+          { className: "yrs", text: "" },
+          { className: "pts", text: "" },
+          { className: "gp", text: "" },
+          { className: "avg", text: "" },
+          { className: "proj", text: fromName || "", noWrap: true },
+        ])
+      );
     }
 
-    tbody.appendChild(trRow(
-      [{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }],
-      "sepRow"
-    ));
+    tbody.appendChild(
+      trRow([{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }], "sepRow")
+    );
   }
 }
 
@@ -486,26 +516,30 @@ function renderCompareTables() {
 
   if (!leftRoster || !rightRoster) {
     if (!leftRoster) {
-      leftTBody.appendChild(trRow([
-        { className: "pos", text: "" },
-        { className: "player", text: "Select a Left team…" },
-        { className: "yrs", text: "" },
-        { className: "pts", text: "" },
-        { className: "gp", text: "" },
-        { className: "avg", text: "" },
-        { className: "nfl", text: "" }
-      ]));
+      leftTBody.appendChild(
+        trRow([
+          { className: "pos", text: "" },
+          { className: "player", text: "Select a Left team…" },
+          { className: "yrs", text: "" },
+          { className: "pts", text: "" },
+          { className: "gp", text: "" },
+          { className: "avg", text: "" },
+          { className: "proj", text: "" },
+        ])
+      );
     }
     if (!rightRoster) {
-      rightTBody.appendChild(trRow([
-        { className: "pos", text: "" },
-        { className: "player", text: "Select a Right team…" },
-        { className: "yrs", text: "" },
-        { className: "pts", text: "" },
-        { className: "gp", text: "" },
-        { className: "avg", text: "" },
-        { className: "nfl", text: "" }
-      ]));
+      rightTBody.appendChild(
+        trRow([
+          { className: "pos", text: "" },
+          { className: "player", text: "Select a Right team…" },
+          { className: "yrs", text: "" },
+          { className: "pts", text: "" },
+          { className: "gp", text: "" },
+          { className: "avg", text: "" },
+          { className: "proj", text: "" },
+        ])
+      );
     }
     return;
   }
@@ -513,9 +547,7 @@ function renderCompareTables() {
   const leftGroups = groupPlayers(leftRoster.players);
   const rightGroups = groupPlayers(rightRoster.players);
 
-  const positions = POS_ORDER.filter(
-    p => (leftGroups[p]?.length || 0) + (rightGroups[p]?.length || 0) > 0
-  );
+  const positions = POS_ORDER.filter((p) => (leftGroups[p]?.length || 0) + (rightGroups[p]?.length || 0) > 0);
 
   for (const pos of positions) {
     const L = leftGroups[pos] || [];
@@ -534,6 +566,8 @@ function renderCompareTables() {
         const pts = fantasyPointsFromScoring(stats, state.scoring);
         const avg = gp ? pts / gp : 0;
 
+        const projPts = projectionPointsForPlayerId(p.player_id); // <— weekly projection points
+
         const a = document.createElement("a");
         a.textContent = p.full_name || "";
         const url = fantasyProsUrl(p);
@@ -545,20 +579,21 @@ function renderCompareTables() {
         a.style.color = "inherit";
         a.style.textDecoration = "none";
 
-        leftTBody.appendChild(trRow([
-          { className: "pos posCell", text: p.position || "" },
-          { className: `player ${playerStatusClass(leftRoster, p)}`, el: a },
-          { className: "yrs", text: yearsInLeague(p) },
-          { className: "pts", text: pts ? format1(pts) : "" },
-          { className: "gp", text: gp ? String(gp) : "" },
-          { className: "avg", text: gp ? format1(avg) : "" },
-          { className: "nfl", text: nflAbbrev(p) }
-        ]));
+        leftTBody.appendChild(
+          trRow([
+            { className: "pos posCell", text: p.position || "" },
+            { className: `player ${playerStatusClass(leftRoster, p)}`, el: a },
+            { className: "yrs", text: yearsInLeague(p) },
+            { className: "pts", text: pts ? format1(pts) : "" },
+            { className: "gp", text: gp ? String(gp) : "" },
+            { className: "avg", text: gp ? format1(avg) : "" },
+            { className: "proj", text: projPts != null ? format1(projPts) : "" },
+          ])
+        );
       } else {
-        leftTBody.appendChild(trRow(
-          [{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }],
-          "emptyRow"
-        ));
+        leftTBody.appendChild(
+          trRow([{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }], "emptyRow")
+        );
       }
 
       // RIGHT
@@ -569,6 +604,8 @@ function renderCompareTables() {
         const pts = fantasyPointsFromScoring(stats, state.scoring);
         const avg = gp ? pts / gp : 0;
 
+        const projPts = projectionPointsForPlayerId(p.player_id); // <— weekly projection points
+
         const a = document.createElement("a");
         a.textContent = p.full_name || "";
         const url = fantasyProsUrl(p);
@@ -580,31 +617,26 @@ function renderCompareTables() {
         a.style.color = "inherit";
         a.style.textDecoration = "none";
 
-        rightTBody.appendChild(trRow([
-          { className: "pos posCell", text: p.position || "" },
-          { className: `player ${playerStatusClass(rightRoster, p)}`, el: a },
-          { className: "yrs", text: yearsInLeague(p) },
-          { className: "pts", text: pts ? format1(pts) : "" },
-          { className: "gp", text: gp ? String(gp) : "" },
-          { className: "avg", text: gp ? format1(avg) : "" },
-          { className: "nfl", text: nflAbbrev(p) }
-        ]));
+        rightTBody.appendChild(
+          trRow([
+            { className: "pos posCell", text: p.position || "" },
+            { className: `player ${playerStatusClass(rightRoster, p)}`, el: a },
+            { className: "yrs", text: yearsInLeague(p) },
+            { className: "pts", text: pts ? format1(pts) : "" },
+            { className: "gp", text: gp ? String(gp) : "" },
+            { className: "avg", text: gp ? format1(avg) : "" },
+            { className: "proj", text: projPts != null ? format1(projPts) : "" },
+          ])
+        );
       } else {
-        rightTBody.appendChild(trRow(
-          [{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }],
-          "emptyRow"
-        ));
+        rightTBody.appendChild(
+          trRow([{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }], "emptyRow")
+        );
       }
     }
 
-    leftTBody.appendChild(trRow(
-      [{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }],
-      "sepRow"
-    ));
-    rightTBody.appendChild(trRow(
-      [{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }],
-      "sepRow"
-    ));
+    leftTBody.appendChild(trRow([{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }], "sepRow"));
+    rightTBody.appendChild(trRow([{ text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }, { text: "" }], "sepRow"));
   }
 
   // Picks at bottom
@@ -639,10 +671,10 @@ async function loadLeagues() {
   }
 
   let auto = state.leagues[0].league_id;
-  const psycho = state.leagues.find(l => (l.name || "").toLowerCase().includes("psycho"));
+  const psycho = state.leagues.find((l) => (l.name || "").toLowerCase().includes("psycho"));
   if (psycho) auto = psycho.league_id;
 
-  state.leagues.forEach(l => {
+  state.leagues.forEach((l) => {
     const opt = document.createElement("option");
     opt.value = l.league_id;
     opt.textContent = l.name || l.league_id;
@@ -655,7 +687,7 @@ async function loadLeagues() {
   setStatus("League list loaded ✅");
 }
 
-/* ===== Load league + users + rosters + stats ===== */
+/* ===== Load league + users + rosters + stats + projections ===== */
 async function loadLeagueData() {
   state.leagueId = elLeagueSelect.value;
   if (!state.leagueId) return;
@@ -664,27 +696,26 @@ async function loadLeagueData() {
   state.league = await fetchJSON(`https://api.sleeper.app/v1/league/${state.leagueId}`);
   state.scoring = state.league?.scoring_settings || {};
 
-  const rounds =
-    state.league?.settings?.draft_rounds ??
-    state.league?.draft_settings?.rounds ??
-    7;
+  const rounds = state.league?.settings?.draft_rounds ?? state.league?.draft_settings?.rounds ?? 7;
   state.draftRounds = Number(rounds) || 7;
 
   setStatus("Loading users + rosters…");
   const [users, rosters] = await Promise.all([
     fetchJSON(`https://api.sleeper.app/v1/league/${state.leagueId}/users`),
-    fetchJSON(`https://api.sleeper.app/v1/league/${state.leagueId}/rosters`)
+    fetchJSON(`https://api.sleeper.app/v1/league/${state.leagueId}/rosters`),
   ]);
 
   state.users = users;
   state.rosters = rosters;
 
   state.usersById = {};
-  users.forEach(u => { state.usersById[u.user_id] = u; });
+  users.forEach((u) => {
+    state.usersById[u.user_id] = u;
+  });
 
   state.rosterByOwner = {};
   state.rosterByRosterId = {};
-  rosters.forEach(r => {
+  rosters.forEach((r) => {
     state.rosterByOwner[r.owner_id] = r;
     state.rosterByRosterId[String(r.roster_id)] = r;
   });
@@ -702,6 +733,7 @@ async function loadLeagueData() {
     state.playersById = await fetchJSON(`https://api.sleeper.app/v1/players/${SPORT}`);
   }
 
+  // ===== Season stats =====
   setStatus("Loading season stats…");
   let statsRaw = null;
   try {
@@ -723,6 +755,31 @@ async function loadLeagueData() {
     }
   }
 
+  // ===== Weekly projections (current league week) =====
+  setStatus("Loading weekly projections…");
+  const week = getCurrentLeagueWeek();
+
+  let projRaw = null;
+  try {
+    projRaw = await fetchJSON(`https://api.sleeper.app/v1/projections/${SPORT}/regular/${state.season}/${week}`);
+  } catch (e) {
+    projRaw = null;
+  }
+
+  state.projectionsByPlayerId = {};
+  if (Array.isArray(projRaw)) {
+    for (const item of projRaw) {
+      const pid = item.player_id;
+      if (!pid) continue;
+      state.projectionsByPlayerId[pid] = item.stats || item;
+    }
+  } else if (projRaw && typeof projRaw === "object") {
+    for (const [pid, val] of Object.entries(projRaw)) {
+      state.projectionsByPlayerId[pid] = val?.stats || val;
+    }
+  }
+
+  // reset selections
   state.currentLeftOwnerId = null;
   state.currentRightOwnerId = null;
   elLeftTitle.textContent = "Left Roster";
