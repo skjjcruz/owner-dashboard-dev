@@ -194,6 +194,7 @@ function playerStatusClass(roster, playerObj) {
 
   if (Array.isArray(roster.reserve) && roster.reserve.map(String).includes(pid)) return "psIR";
   if (Array.isArray(roster.taxi) && roster.taxi.map(String).includes(pid)) return "psTaxi";
+  if (Array.isArray(roster.starters) && roster.starters.map(String).includes(pid)) return "psStarter";
   if (playerObj?.years_exp === 0) return "psRookie";
 
   return "";
