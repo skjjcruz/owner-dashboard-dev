@@ -279,3 +279,41 @@ td.pos{
   .layout{ grid-template-columns: 1fr; }
   :root{ --teams-w: 100%; }
 }
+/* =========================
+   LOCK SCROLL: vertical only
+   Paste at VERY BOTTOM
+========================= */
+
+/* Stop page-level sideways drift */
+html, body{
+  overflow-x: hidden;
+}
+
+/* Only vertical scroll inside the panes */
+.tableScroll{
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  touch-action: pan-y;                 /* vertical only */
+  -webkit-overflow-scrolling: touch;
+}
+
+.teamsList{
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  touch-action: pan-y;                 /* vertical only */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Make the table fit the pane (no sideways scroll needed) */
+#leftTable, #rightTable{
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+/* Prevent a long name from forcing horizontal scroll */
+#leftTable td.player, #rightTable td.player{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
