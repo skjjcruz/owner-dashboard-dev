@@ -1,4 +1,4 @@
-const CACHE_NAME = "owner-dash-v1.0.0";
+const CACHE_NAME = "owner-dash-v1.0.1"; // <-- bump this anytime you change CSS/JS/HTML
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,9 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS))
+  );
   self.skipWaiting();
 });
 
@@ -26,10 +28,31 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
 
-  // Always go to network for API calls (Sleeper) so data stays fresh
+  // Always go to network for API calls
   if (req.url.includes("api.sleeper.app")) return;
 
-  e.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
-  );
+  // Network-first for HTML/CSS/JS so updates show immediately
+  const isCoreAsset =
+    req.destination === "document" ||
+    req.destination === "style" ||
+    req.destination === "script" ||
+    req.url.endsWith(".css") ||
+    req.url.endsWith(".js") ||
+    req.url.endsWith(".html");
+
+  if (isCoreAsset) {
+    e.respondWith(
+      fetch(req)
+        .then((fresh) => {
+          const copy = fresh.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+          return fresh;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Cache-first for everything else
+  e.respondWith(caches.match(req).then((cached) => cached || fetch(req)));
 });
