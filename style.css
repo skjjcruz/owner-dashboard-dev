@@ -317,3 +317,38 @@ html, body{
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* =========================
+   SCROLL FIX (iPad / Safari)
+   Paste at VERY BOTTOM
+========================= */
+
+html, body { height: 100%; }
+
+body{
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make the main 3-column area fill the remaining screen below the topbar */
+.layout{
+  flex: 1 1 auto;
+  min-height: 0;                 /* REQUIRED for iOS inner scrolling */
+  height: calc(100svh - 92px);   /* adjust 92px if your topbar height changes */
+}
+
+/* Cards must allow inner scrolling containers to shrink */
+.teamsPane,
+.tablePane{
+  min-height: 0;
+}
+
+/* The actual scrolling containers */
+.teamsList,
+.tableScroll{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
