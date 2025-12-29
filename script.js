@@ -11,7 +11,7 @@
 
 const SPORT = "nfl";
 const DEFAULT_SEASON = "2025";
-const DEFAULT_USERNAME = "skjjcruz"; // only used if no lock exists
+const DEFAULT_USERNAME = "";
 
 const POS_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF", "DL", "LB", "DB", "OTHER"];
 const PICK_YEARS = [2026, 2027, 2028];
