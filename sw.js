@@ -1,4 +1,4 @@
-const CACHE_NAME = "owner-dash-v1.0.1"; // <-- bump this anytime you change CSS/JS/HTML
+const CACHE_NAME = "owner-dash-v1.0.1";
 const ASSETS = [
   "./",
   "./index.html",
